@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Bankruptcy Predictor</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --primary:#0b6eff; --primary-600:#0757d1; --danger:#ff4d4f; --muted:#6b7280;
+      --card-bg: rgba(255,255,255,0.94); --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:"Inter",system-ui,Arial,sans-serif;color:#0f1724}
+    body{
+      background-image: url("{{ url_for('static', filename='bankruptcy_office_bg.jpg.jpg') }}");
+      background-size: cover; background-position: center; background-attachment: fixed;
+      display:flex; align-items:center; justify-content:center; padding:28px;
+    }
+    .overlay{ position:fixed; inset:0; background: linear-gradient(180deg, rgba(5,10,15,0.45), rgba(2,6,12,0.55)); z-index:0; backdrop-filter: blur(2px); }
+    .wrap{ position:relative; z-index:1; width:100%; max-width:980px; display:grid; grid-template-columns: 1fr 420px; gap:28px; align-items:center; }
+    .panel-left{
+      padding:28px; border-radius:var(--radius); min-height:520px; display:flex; flex-direction:column; justify-content:center; gap:18px;
+      color:#fff; background: linear-gradient(135deg, rgba(3,6,11,0.24), rgba(6,12,20,0.24)); box-shadow:0 12px 40px rgba(2,6,12,0.5); backdrop-filter: blur(3px) saturate(120%);
+    }
+    .panel-left h2{ margin:0;font-size:28px; color:#fff; }
+    .panel-left p{ margin:0; color:rgba(255,255,255,0.9); line-height:1.5; font-size:15px; }
+    .trend { margin-top:8px; background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); padding:14px; border-radius:10px; display:flex; gap:12px; align-items:center; }
+    .trend .dot { width:12px;height:12px;border-radius:50%; background:var(--danger); box-shadow:0 4px 18px rgba(255,77,79,0.2); }
+    .card{ background: var(--card-bg); border-radius:var(--radius); padding:22px; box-shadow: 0 12px 36px rgba(2,6,12,0.18); border:1px solid rgba(2,6,23,0.06); }
+    .brand{ display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+    .logo{ width:48px; height:48px; border-radius:10px; display:inline-grid; place-items:center; font-weight:700; color:var(--primary); background:linear-gradient(135deg, rgba(11,110,255,0.08), rgba(11,110,255,0.02)); font-size:18px; box-shadow:0 6px 18px rgba(11,110,255,0.06) inset; }
+    h1{ font-size:18px; margin:0; color:#06203a; }
+    .muted{ color:var(--muted); font-size:13px; margin-top:6px; }
+    .fields{ margin-top:14px; display:grid; gap:12px; }
+    label{ display:block; font-size:13px; color:#203040; font-weight:600; margin-bottom:6px; }
+    input[type="number"]{ width:100%; padding:12px 12px; border-radius:10px; border:1px solid #e6e9ef; font-size:14px; background:linear-gradient(180deg,#fff,#fbfdff); }
+    input[type="number"]:focus{ border-color:var(--primary); box-shadow:0 6px 18px rgba(11,110,255,0.08); transform: translateY(-1px); }
+    .button-row{ margin-top:12px; display:flex; gap:10px; align-items:center; }
+    button.primary{ flex:1; background: linear-gradient(180deg,var(--primary), var(--primary-600)); color:white; border:none; padding:12px 14px; border-radius:10px; cursor:pointer; font-weight:700; font-size:15px; box-shadow:0 8px 20px rgba(11,110,255,0.18); }
+    button.ghost{ background:transparent; border:1px solid #e6e9ef; padding:10px 12px; border-radius:10px; cursor:pointer; }
+    .result{ margin-top:14px; display:flex; align-items:center; justify-content:center; min-height:54px; position:relative; }
+    .result-card{ padding:12px 16px; border-radius:12px; display:inline-flex; gap:12px; align-items:center; justify-content:center; font-weight:700; color:#fff; transform-origin:center; transition: transform .22s cubic-bezier(.2,.9,.26,1), opacity .22s ease; box-shadow:0 10px 30px rgba(2,6,23,0.2); }
+    .result-card.success{ background: linear-gradient(90deg,#1bc47d,#14a86f); }
+    .result-card.danger{ background: linear-gradient(90deg,#ff6b6b,#ff4d4f); }
+    .spinner{ width:18px; height:18px; border-radius:50%; border:3px solid rgba(255,255,255,0.25); border-top-color: rgba(255,255,255,0.9); animation: spin 0.9s linear infinite; }
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+    .info-link{ font-size:13px; color:var(--primary); cursor:pointer; text-decoration:underline; margin-left:6px; }
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(2,6,12,0.5); display:none; align-items:center; justify-content:center; z-index:9999; }
+    .modal{ width:92%; max-width:640px; background:white; border-radius:12px; padding:20px; box-shadow:0 18px 60px rgba(2,6,12,0.4); }
+    .modal h3{ margin-top:0; }
+    .modal .grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .badge{ font-size:13px; color:#fff; padding:6px 8px; border-radius:8px; display:inline-block; }
+    .badge.warn{ background:#ff6b6b; }
+    .badge.info{ background:#0b6eff; }
+    .close-btn{ margin-top:14px; padding:8px 10px; border-radius:8px; border:none; background:#e6e9ef; cursor:pointer; }
+    .small{ font-size:13px; color:var(--muted); }
+    /* probability bar animation */
+    #barBankrupt, #barNon { transition: width 700ms cubic-bezier(.2,.9,.26,1); }
+    @media (max-width:880px){ .wrap{ grid-template-columns:1fr; } .panel-left{ order:2 } }
+
+    /* print-friendly */
+   @media print {
+  body { 
+    background: #fff !important; 
+    color: #000 !important; 
+    -webkit-print-color-adjust: exact; /* for Chrome, Edge, Safari */
+    print-color-adjust: exact;         /* for Firefox and standards compliance */
+  }
+
+  .overlay, .modal-backdrop, button, input { display: none !important; }
+  .card, .panel-left { box-shadow: none !important; background: transparent !important; border: none !important; }
+  .result-card { position: static !important; transform:none !important; }
+  #probBars { page-break-inside: avoid; }
+}
+  </style>
+</head>
+<body>
+  <div class="overlay" aria-hidden="true"></div>
+
+  <div class="wrap" role="main" aria-live="polite">
+    <div class="panel-left" aria-hidden="false">
+      <h2>Bankruptcy Risk Insight</h2>
+      <p class="small">A quick diagnostic UI using a trained model. Adjust features to see how the model responds. Use the info link for feature explanations.</p>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+        <div class="trend" style="flex:1">
+          <div style="flex:1">
+            <div class="dot" style="background:rgba(255,77,79,1); width:10px;height:10px;border-radius:50%;margin-bottom:6px"></div>
+            <div class="small">Market downward trend detected</div>
+          </div>
+          <div style="text-align:right">
+            <div class="small">Model</div>
+            <div style="font-weight:700; color:#fff; opacity:0.9; margin-top:6px">Confidence: medium</div>
+          </div>
+        </div>
+      </div>
+      <p class="small" style="margin-top:14px">Tip: Use realistic feature ranges (0–1 or model's scale) to get meaningful results.</p>
+      <div style="margin-top:18px">
+        <button class="ghost" id="openInfo">What do these mean?</button>
+      </div>
+    </div>
+
+    <div class="card" role="form" aria-labelledby="title">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="#" aria-hidden="true">
+            <rect x="2" y="2" width="20" height="20" rx="4" fill="white" opacity="0.02"/>
+            <path d="M6 15 L10 9 L14 13 L18 7" stroke="#0b6eff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div>
+          <h1 id="title">Bankruptcy Predictor</h1>
+          <div class="muted">Enter 6 features & get a color-coded result</div>
+        </div>
+      </div>
+
+      <form id="predictionForm" autocomplete="off" novalidate>
+        <div class="fields">
+          <div>
+            <label for="industrial_risk">Industrial Risk</label>
+            <input id="industrial_risk" name="industrial_risk" type="number" step="0.01" value="0.2" required>
+          </div>
+          <div>
+            <label for="management_risk">Management Risk</label>
+            <input id="management_risk" name="management_risk" type="number" step="0.01" value="0.5" required>
+          </div>
+          <div>
+            <label for="financial_flexibility">Financial Flexibility</label>
+            <input id="financial_flexibility" name="financial_flexibility" type="number" step="0.01" value="0.7" required>
+          </div>
+          <div>
+            <label for="credibility">Credibility</label>
+            <input id="credibility" name="credibility" type="number" step="0.01" value="0.6" required>
+          </div>
+          <div>
+            <label for="competitiveness">Competitiveness</label>
+            <input id="competitiveness" name="competitiveness" type="number" step="0.01" value="0.4" required>
+          </div>
+          <div>
+            <label for="operating_risk">Operating Risk</label>
+            <input id="operating_risk" name="operating_risk" type="number" step="0.01" value="0.5" required>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="predictBtn" class="primary" type="submit">Predict</button>
+          <button id="resetBtn" type="button" class="ghost">Reset</button>
+        </div>
+
+        <div class="result" aria-live="polite">
+          <div id="resultCard" style="display:none"></div>
+        </div>
+
+        <!-- Probability bars -->
+        <div id="probBars" style="display:none; margin-top:12px;">
+          <div style="font-size:13px; color:var(--muted); margin-bottom:6px;">Model probabilities</div>
+          <div style="background:#eef2f6; border-radius:10px; overflow:hidden; height:16px; position:relative;">
+            <div id="barBankrupt" style="width:0%; height:100%; background:linear-gradient(90deg,#ff6b6b,#ff4d4f);"></div>
+            <div id="barNon" style="width:0%; height:100%; background:linear-gradient(90deg,#1bc47d,#14a86f); position:absolute; right:0; top:0;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:13px;">
+            <div>Bankrupt <span id="pctBank" style="font-weight:700">0%</span></div>
+            <div>Non-Bankrupt <span id="pctNon" style="font-weight:700">0%</span></div>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <div id="modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document">
+      <h3>Feature explanations</h3>
+      <p class="small">Short descriptions of the features used by the model. These are for UI clarity and may not match your dataset pre-processing exactly.</p>
+      <div class="grid" style="margin-top:12px">
+        <div>
+          <div class="badge warn">Industrial Risk</div>
+          <p class="small" style="margin-top:8px">Measures exposure to industry-specific downturns (higher → more risk).</p>
+        </div>
+        <div>
+          <div class="badge info">Management Risk</div>
+          <p class="small" style="margin-top:8px">Quality/stability of leadership; poor scores increase bankruptcy likelihood.</p>
+        </div>
+        <div>
+          <div class="badge info">Financial Flexibility</div>
+          <p class="small" style="margin-top:8px">Liquidity and ability to manage short-term obligations (higher is better).</p>
+        </div>
+        <div>
+          <div class="badge warn">Credibility</div>
+          <p class="small" style="margin-top:8px">Creditworthiness and reputation — lower values mean more risk.</p>
+        </div>
+        <div>
+          <div class="badge info">Competitiveness</div>
+          <p class="small" style="margin-top:8px">Market position relative to peers; lower competitiveness raises risk.</p>
+        </div>
+        <div>
+          <div class="badge warn">Operating Risk</div>
+          <p class="small" style="margin-top:8px">Operational stability — high operational risk increases bankruptcy chance.</p>
+        </div>
+      </div>
+
+      <div style="text-align:right">
+        <button id="closeModal" class="close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('predictionForm');
+    const resultCard = document.getElementById('resultCard');
+    const predictBtn = document.getElementById('predictBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const modal = document.getElementById('modal');
+    const openInfo = document.getElementById('openInfo');
+    const closeModal = document.getElementById('closeModal');
+
+    // probability bar elements
+    const probBars = document.getElementById('probBars');
+    const barBank = document.getElementById('barBankrupt');
+    const barNon = document.getElementById('barNon');
+    const pctBank = document.getElementById('pctBank');
+    const pctNon = document.getElementById('pctNon');
+
+    function showResult(text, status) {
+      resultCard.innerHTML = '';
+      resultCard.style.display = 'inline-flex';
+      resultCard.className = 'result-card ' + (status === 'danger' ? 'danger' : 'success');
+      const span = document.createElement('span'); span.textContent = text; resultCard.appendChild(span);
+      resultCard.style.transform = 'scale(.92)'; resultCard.style.opacity='0';
+      requestAnimationFrame(()=>{ resultCard.style.transition='transform .22s, opacity .22s'; resultCard.style.transform='scale(1)'; resultCard.style.opacity='1'; });
+      clearTimeout(resultCard._hideTimer);
+      resultCard._hideTimer = setTimeout(()=>{ resultCard.style.transform='scale(.96)'; resultCard.style.opacity='0'; setTimeout(()=>resultCard.style.display='none',260); }, 6000);
+    }
+    function showLoading() {
+      resultCard.innerHTML=''; resultCard.style.display='inline-flex'; resultCard.className='result-card';
+      const spinner = document.createElement('div'); spinner.className='spinner';
+      const span = document.createElement('span'); span.textContent=' Predicting...'; span.style.color='white'; span.style.fontWeight=700; span.style.marginLeft='8px';
+      resultCard.appendChild(spinner); resultCard.appendChild(span);
+    }
+
+    function getPayload(){
+      return {
+        industrial_risk: parseFloat(document.getElementById('industrial_risk').value || 0),
+        management_risk: parseFloat(document.getElementById('management_risk').value || 0),
+        financial_flexibility: parseFloat(document.getElementById('financial_flexibility').value || 0),
+        credibility: parseFloat(document.getElementById('credibility').value || 0),
+        competitiveness: parseFloat(document.getElementById('competitiveness').value || 0),
+        operating_risk: parseFloat(document.getElementById('operating_risk').value || 0)
+      };
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = getPayload();
+      for (let k in payload) if (Number.isNaN(payload[k])) { showResult('Please enter valid numbers', 'danger'); return; }
+      predictBtn.disabled=true; predictBtn.textContent='Predicting...'; showLoading();
+
+      try {
+        const res = await fetch('/predict', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showResult(data.error || 'Server error', 'danger');
+          probBars.style.display = 'none';
+        } else {
+          // normalize label to a simple lower-case string
+          const rawLabel = (data && data.prediction) ? String(data.prediction).toLowerCase().trim() : '';
+
+          // explicit checks for known values
+          const isNon = rawLabel === 'non-bankrupt' || rawLabel === 'nonbankrupt' || rawLabel === 'non bankrupt' || rawLabel === 'non bankruptcy';
+          const isBankrupt = rawLabel === 'bankrupt' || rawLabel === 'bankruptcy' || rawLabel === '1' || rawLabel === 'true';
+
+          // If label ambiguous or unexpected, fall back to probabilities (if available)
+          let finalIsBankrupt = null;
+          if (isBankrupt) finalIsBankrupt = true;
+          else if (isNon) finalIsBankrupt = false;
+          else if (data && data.bankrupt_probability_percent != null) {
+            finalIsBankrupt = Number(data.bankrupt_probability_percent) > 50;
+          } else if (data && data.probabilities_by_class && data.probabilities_by_class['bankruptcy'] != null) {
+            finalIsBankrupt = Number(data.probabilities_by_class['bankruptcy']) > 0.5;
+          } else {
+            // fallback: treat unknown as borderline non-bankrupt
+            finalIsBankrupt = false;
+          }
+
+          // update probability bars if available
+          let bankruptPct = null;
+          let nonBankPct = null;
+          if (data && data.bankrupt_probability_percent != null) {
+            bankruptPct = Number(data.bankrupt_probability_percent);
+            nonBankPct = Number(data.non_bankrupt_probability_percent ?? (100 - bankruptPct));
+          } else if (data && data.probabilities_by_class && data.probabilities_by_class['bankruptcy'] != null) {
+            bankruptPct = Math.round(data.probabilities_by_class['bankruptcy'] * 100);
+            nonBankPct = Math.round((data.probabilities_by_class['non-bankruptcy'] ?? (1 - data.probabilities_by_class['bankruptcy'])) * 100);
+          }
+
+          if (bankruptPct != null && nonBankPct != null) {
+            probBars.style.display = 'block';
+            barBank.style.width = bankruptPct + '%';
+            barNon.style.width = nonBankPct + '%';
+            pctBank.textContent = bankruptPct + '%';
+            pctNon.textContent = nonBankPct + '%';
+          } else {
+            probBars.style.display = 'none';
+          }
+
+          if (finalIsBankrupt) {
+            const probText = data && data.bankrupt_probability_percent != null ? ` (${data.bankrupt_probability_percent}%)` : '';
+            showResult('Bankrupt — high risk' + probText, 'danger');
+          } else {
+            const probText = data && data.non_bankrupt_probability_percent != null ? ` (${data.non_bankrupt_probability_percent}%)` : '';
+            showResult('Non-Bankrupt — low risk' + probText, 'success');
+          }
+        }
+      } catch (err) {
+        showResult('Network error: ' + err.message, 'danger');
+        probBars.style.display = 'none';
+      } finally {
+        predictBtn.disabled=false; predictBtn.textContent='Predict';
+      }
+    });
+
+    resetBtn.addEventListener('click', ()=> {
+      document.getElementById('industrial_risk').value='0.2';
+      document.getElementById('management_risk').value='0.5';
+      document.getElementById('financial_flexibility').value='0.7';
+      document.getElementById('credibility').value='0.6';
+      document.getElementById('competitiveness').value='0.4';
+      document.getElementById('operating_risk').value='0.5';
+      showResult('Values reset', 'success');
+      probBars.style.display = 'none';
+      barBank.style.width = '0%';
+      barNon.style.width = '0%';
+      pctBank.textContent = '0%';
+      pctNon.textContent = '0%';
+    });
+
+    openInfo.addEventListener('click', ()=> { modal.style.display='flex'; modal.setAttribute('aria-hidden','false'); });
+    closeModal.addEventListener('click', ()=> { modal.style.display='none'; modal.setAttribute('aria-hidden','true'); });
+    modal.addEventListener('click', (e)=> { if (e.target === modal) { modal.style.display='none'; modal.setAttribute('aria-hidden','true'); } });
+    document.addEventListener('keydown', (e)=> { if (e.key === 'Escape') { modal.style.display='none'; modal.setAttribute('aria-hidden','true'); } });
+  </script>
+</body>
+</html>
+
+
